@@ -42,3 +42,7 @@ windows/z_auth_embedded.go
 
 .omx
 .tools/
+
+# Signing keys (serg/tasks#3045)
+*.jks
+*.keystore

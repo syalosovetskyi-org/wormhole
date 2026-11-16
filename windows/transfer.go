@@ -136,25 +136,32 @@ func runReceive(code, codeID, filename string) {
 			return
 		}
 
-		progressCh <- recvProgressEvent{
-			Filename: msg.Name,
-			Size:     int64(msg.TransferBytes64),
+		if msg.Type != ww.TransferFile {
+			const e = "поддерживается только приём файлов"
+			progressCh <- recvProgressEvent{Error: e}
+			showErrorToast("Ошибка получения", e)
+			return
 		}
 
 		destDir := desktopDir()
-		outPath := filepath.Join(destDir, msg.Name)
-
-		outDirMu.Lock()
-		outDir = destDir
-		outDirMu.Unlock()
-
-		f, err := os.Create(outPath)
+		// msg.Name comes from the remote peer: never use it as a path.
+		f, outPath, err := createOutputFile(destDir, msg.Name)
 		if err != nil {
 			progressCh <- recvProgressEvent{Error: err.Error()}
 			showErrorToast("Ошибка создания файла", err.Error())
 			return
 		}
 		defer f.Close()
+		savedName := filepath.Base(outPath)
+
+		outDirMu.Lock()
+		outDir = destDir
+		outDirMu.Unlock()
+
+		progressCh <- recvProgressEvent{
+			Filename: savedName,
+			Size:     int64(msg.TransferBytes64),
+		}
 
 		buf := make([]byte, 32*1024)
 		var received int64
@@ -186,7 +193,7 @@ func runReceive(code, codeID, filename string) {
 
 		ackCode(codeID)
 		progressCh <- recvProgressEvent{Done: true}
-		showReceivedToast(msg.Name, outPath)
+		showReceivedToast(savedName, outPath)
 	}()
 
 	// Block until transfer finishes, keeping the process (and HTTP server) alive.

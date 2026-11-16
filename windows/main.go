@@ -121,16 +121,35 @@ func handleURI(raw string) {
 
 	switch action {
 	case "receive":
-		// payload = CODE:CODEID:FILENAME
+		// payload = CODE:CODEID:FILENAME. Any web page can open a wormhole: link,
+		// so only receive a code the relay actually queued for this device, and
+		// take the file name from the relay, not from the URI.
 		p := strings.SplitN(payload, ":", 3)
-		if len(p) == 3 {
-			runReceive(p[0], p[1], p[2])
+		if len(p) != 3 {
+			return
 		}
+		pending, err := pollIncoming()
+		if err != nil {
+			showErrorToast("Wormhole", "Не удалось проверить входящий файл: "+err.Error())
+			return
+		}
+		pc, ok := matchPending(pending, p[0], p[1])
+		if !ok {
+			showErrorToast("Wormhole", "Входящий файл не найден среди ожидающих — ссылка отклонена")
+			return
+		}
+		runReceive(pc.Code, pc.ID, pc.Filename)
 	case "decline":
 		// payload = CODEID
 		ackCode(payload)
 	case "openfolder":
-		openFolder(filepath.Clean(payload))
+		// Only the receive folders, and only directories: explorer given a file
+		// path would open (run) that file.
+		if isAllowedOpenFolder(payload, receiveFolders()) {
+			openFolder(filepath.Clean(payload))
+		} else {
+			showErrorToast("Wormhole", "Отказано: папка не из списка папок приёма")
+		}
 	}
 }
 

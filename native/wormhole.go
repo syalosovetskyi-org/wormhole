@@ -83,8 +83,8 @@ func ReceiveFile(code, destDir string, cb ReceiveCallback) {
 		return
 	}
 
-	outPath := filepath.Join(destDir, msg.Name)
-	f, err := os.Create(outPath)
+	// msg.Name comes from the remote peer: never use it as a path.
+	f, outPath, err := createOutputFile(destDir, msg.Name)
 	if err != nil {
 		cb.OnError(fmt.Sprintf("create: %v", err))
 		return
